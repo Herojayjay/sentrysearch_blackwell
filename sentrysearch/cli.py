@@ -1390,3 +1390,89 @@ def dlq_clear():
     q = DeadLetterQueue()
     count = q.clear()
     click.echo(f"Cleared {count} DLQ entries.")
+
+
+# -----------------------------------------------------------------------
+# duplicates
+# -----------------------------------------------------------------------
+
+@cli.command()
+@click.option("--distance-threshold", default=0.05, type=float, show_default=True,
+              help="Distance threshold for considering a chunk a duplicate (lower is stricter).")
+@click.option("--backend", type=click.Choice(_BACKEND_CHOICES), default=None,
+              help="Backend to search (auto-detected if omitted).")
+@click.option("--model", default=None,
+              help="Model to search (auto-detected if omitted). Implies --backend local.")
+def duplicates(distance_threshold, backend, model):
+    """Find nearly identical or duplicate videos."""
+    from .store import SentryStore, detect_index
+
+    if model is not None and backend is None:
+        backend = "local"
+    if backend is None:
+        backend, detected_model = detect_index()
+        backend = backend or "gemini"
+        if model is None:
+            model = detected_model
+    elif backend == "local" and model is None:
+        _, model = detect_index()
+
+    store = SentryStore(backend=backend, model=model)
+    collection = store.collection
+
+    click.echo("Fetching data from index...")
+    all_data = collection.get(include=["embeddings", "metadatas"])
+    
+    ids = all_data.get("ids", [])
+    if not ids:
+        click.echo("Index is empty. Run `sentrysearch index <directory>` first.")
+        return
+        
+    embeddings = all_data.get("embeddings", [])
+    metadatas = all_data.get("metadatas", [])
+    
+    click.echo(f"Analyzing {len(ids)} chunks for duplicates...")
+    
+    duplicates_found = []
+    processed_pairs = set()
+
+    results = collection.query(
+        query_embeddings=embeddings,
+        n_results=2,
+        include=["distances", "metadatas"]
+    )
+    
+    for i in range(len(ids)):
+        source_id = ids[i]
+        source_file = metadatas[i]["source_file"]
+        
+        matches = results["ids"][i]
+        distances = results["distances"][i]
+        match_metas = results["metadatas"][i]
+        
+        for match_idx, match_id in enumerate(matches):
+            if match_id == source_id:
+                continue # Skip self
+                
+            distance = distances[match_idx]
+            match_file = match_metas[match_idx]["source_file"]
+            
+            if distance < distance_threshold and source_file != match_file:
+                pair = tuple(sorted([source_file, match_file]))
+                if pair not in processed_pairs:
+                    processed_pairs.add(pair)
+                    duplicates_found.append({
+                        "file_1": pair[0],
+                        "file_2": pair[1],
+                        "distance": distance
+                    })
+
+    if duplicates_found:
+        click.secho("\nPossible Duplicates Found:", fg="yellow")
+        for dup in duplicates_found:
+            click.echo(f"- Distance {dup['distance']:.4f}")
+            click.echo(f"  File A: {dup['file_1']}")
+            click.echo(f"  File B: {dup['file_2']}\n")
+    else:
+        click.secho("No duplicates found.", fg="green")
+
