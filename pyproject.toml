@@ -15,20 +15,20 @@ dependencies = [
 [project.optional-dependencies]
 tesla = ["geopy"]
 local = [
-    "torch>=2.0",
-    "torchvision>=0.15,<0.22",
+    "torch==2.10.0",
+    "torchvision>=0.15",
     "transformers>=5.3",
     "accelerate",
     "qwen-vl-utils",
-    "torchcodec>=0.6",
+    "torchcodec==0.10.0",
 ]
 local-quantized = [
-    "torch>=2.0",
-    "torchvision>=0.15,<0.22",
+    "torch==2.10.0",
+    "torchvision>=0.15",
     "transformers>=5.3",
     "accelerate",
     "qwen-vl-utils",
-    "torchcodec>=0.6",
+    "torchcodec==0.10.0",
     "bitsandbytes",
 ]
 qwen-cloud = [
@@ -61,12 +61,12 @@ constraint-dependencies = [
 # silently get a CPU build. Pull from PyTorch's CUDA index on Windows only;
 # Linux already gets CUDA-enabled wheels from PyPI, and macOS needs PyPI for MPS.
 [tool.uv.sources]
-torch = [{ index = "pytorch-cu124", marker = "sys_platform == 'win32'" }]
-torchvision = [{ index = "pytorch-cu124", marker = "sys_platform == 'win32'" }]
+torch = [{ index = "pytorch-cu130", marker = "sys_platform == 'win32'" }]
+torchvision = [{ index = "pytorch-cu130", marker = "sys_platform == 'win32'" }]
 
 [[tool.uv.index]]
-name = "pytorch-cu124"
-url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.pytest.ini_options]
